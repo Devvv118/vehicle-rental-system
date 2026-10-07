@@ -30,7 +30,7 @@ from database import engine  # noqa: E402
 from main import app  # noqa: E402
 
 
-SCHEMA_SQL = os.path.join(os.path.dirname(__file__), "..", "..", "database", "schema.sql")
+SCHEMA_SQL = os.path.join(os.path.dirname(__file__), "..", "db", "schema.sql")
 
 
 def run_script(path):

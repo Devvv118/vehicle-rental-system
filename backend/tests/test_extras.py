@@ -189,3 +189,18 @@ def test_maintenance_list_all_includes_future_and_completed(client, make):
     assert r.status_code == 200 and len(r.json()) == 2
     assert r.json()[0]["scheduled_date"] > r.json()[1]["scheduled_date"]  # newest first
     assert client.get("/maintenance/scheduled").json() == []  # the future one is not "due" yet
+
+
+# ------------------------------------------------------------------ demo reset (portfolio deployment)
+def test_reset_demo_restores_example_data(client, make):
+    make.customer(first_name="Temporary")
+    r = client.post("/admin/reset-demo")
+    assert r.status_code == 200, r.text
+    assert len(client.get("/vehicles/", params={"limit": 1000}).json()) == 4
+    names = {c["first_name"] for c in client.get("/customers/", params={"limit": 1000}).json()}
+    assert names == {"Alice", "Bob", "Carol"}
+
+
+def test_reset_demo_can_be_disabled(client, monkeypatch):
+    monkeypatch.setenv("DEMO_RESET_ENABLED", "0")
+    assert client.post("/admin/reset-demo").status_code == 403

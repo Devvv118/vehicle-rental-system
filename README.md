@@ -40,6 +40,14 @@ backend/
   database.py     engine/session setup
   main.py         all the api routes
   tests/          pytest suite
+  db/
+    schema.sql         PostgreSQL tables/indexes/triggers (generated from models.py)
+    seed.sql           reference data (membership tiers, insurance plans, vehicle features)
+    sample_data.sql    demo data
+    init_db.py         one-command database setup
+    demo_reset.py      wipe + reload helper (used by init_db.py and POST /admin/reset-demo)
+    generate_schema.py regenerates schema.sql after you change models.py
+  start.sh             production start script (Render)
 
 frontend/vehicle-rental/
   src/
@@ -47,13 +55,6 @@ frontend/vehicle-rental/
     services/      api calls
     components/
     pages/
-
-database/
-  schema.sql         PostgreSQL tables/indexes/triggers (generated from models.py)
-  seed.sql           reference data (membership tiers, insurance plans, vehicle features)
-  sample_data.sql    optional demo data
-  init_db.py         one-command database setup
-  generate_schema.py regenerates schema.sql after you change models.py
 
 e2e/               browser end-to-end test
 ```
@@ -77,24 +78,24 @@ the reference data such as the `Standard` membership tier the app needs):
 
 ```
 pip install -r backend/requirements.txt
-python database/init_db.py --create-db
+python backend/db/init_db.py --create-db
 ```
 
 Useful options (the script is safe to re-run, it never deletes anything unless you pass `--reset --yes`):
 
 ```
-python database/init_db.py --sample-data     # also load a few demo locations / vehicles / customers
-python database/init_db.py --reset --yes     # DROP everything and rebuild from scratch (destructive!)
+python backend/db/init_db.py --sample-data     # also load a few demo locations / vehicles / customers
+python backend/db/init_db.py --reset --yes     # DROP everything and rebuild from scratch (destructive!)
 ```
 
-Prefer plain SQL? Run `database/schema.sql` then `database/seed.sql` with psql instead:
+Prefer plain SQL? Run `backend/db/schema.sql` then `backend/db/seed.sql` with psql instead:
 
 ```
 createdb car_rental
-psql -d car_rental -f database/schema.sql -f database/seed.sql
+psql -d car_rental -f backend/db/schema.sql -f backend/db/seed.sql
 ```
 
-After changing `backend/models.py` regenerate the SQL with `python database/generate_schema.py`
+After changing `backend/models.py` regenerate the SQL with `python backend/db/generate_schema.py`
 (`--check` verifies it is up to date).
 
 ### Backend
@@ -140,7 +141,7 @@ Built as a learning project, not meant for production use as is.
 
 ## Tests
 
-Backend (real PostgreSQL; the schema is built from `database/schema.sql`; **the `public` schema of the test
+Backend (real PostgreSQL; the schema is built from `backend/db/schema.sql`; **the `public` schema of the test
 database is dropped**, so use a throw-away one):
 
 ```
@@ -162,3 +163,38 @@ python e2e/ui_e2e.py
 ```
 
 See `CHANGES.md` for everything that was fixed and why.
+
+## Deploying (Render + Vercel + Neon)
+
+**1. Neon** - create a project and copy the *direct* (non-pooled) connection string, e.g.
+`postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`.
+
+**2. Render** (Web Service)
+
+| Setting | Value |
+|---|---|
+| Root Directory | `backend` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `bash start.sh` |
+
+Environment variables:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | the Neon connection string |
+| `PYTHON_VERSION` | `3.12.3` |
+| `ALLOWED_ORIGINS` | your Vercel URL, e.g. `https://my-app.vercel.app` (comma separate several) |
+| `ALLOW_VERCEL_PREVIEWS` | `1` to also allow every `*.vercel.app` origin (optional) |
+| `RESET_DB_ON_START` | `1` = wipe the database and reload the demo data on every start (demo mode). Unset = just create missing tables and keep data |
+| `DEMO_RESET_ENABLED` | `0` disables the `POST /admin/reset-demo` endpoint / "Reset demo data" button (default: enabled) |
+
+`start.sh` runs `db/init_db.py` (schema + reference data, plus a full reset if `RESET_DB_ON_START=1`) and then starts uvicorn.
+Note that on Render's free tier the service sleeps after ~15 minutes idle, so a "reset on start" only happens after a
+wake-up; the **Reset demo data** button in the header restores the demo on demand. **Never set `RESET_DB_ON_START=1`
+or leave the reset endpoint enabled on a database that holds real data.**
+
+**3. Vercel** - Root Directory `frontend/vehicle-rental`, framework preset Vite, and the environment variable
+`VITE_API_URL=https://your-api.onrender.com` (no trailing slash). `vercel.json` rewrites every path to `index.html`
+so refreshing a page such as `/customers` works. Redeploy after changing `VITE_API_URL` (Vite bakes it in at build time).
+
+The first request after the backend has been idle takes 30-60 s (Render cold start, plus Neon waking up).

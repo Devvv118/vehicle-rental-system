@@ -28,7 +28,8 @@ import type {
   RevenueReport
 } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000';
+// Set VITE_API_URL in Vercel (e.g. https://my-api.onrender.com, no trailing slash); falls back to local dev
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
 
 // class ApiError extends Error {
 //   constructor(public status: number, message: string) {
@@ -383,3 +384,11 @@ export const vehicleFeaturesApi = {
 };
 
 export { ApiError };
+
+// Demo only: wipes the database and reloads the demo data
+export async function resetDemoData(): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/admin/reset-demo`, { method: 'POST' });
+  if (!response.ok) {
+    throw new ApiError(response.status, (await response.text()) || response.statusText);
+  }
+}

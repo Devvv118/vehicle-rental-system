@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Generates database/schema.sql (PostgreSQL DDL) from the SQLAlchemy models in backend/models.py,
+Generates db/schema.sql (PostgreSQL DDL) from the SQLAlchemy models in backend/models.py,
 so the SQL file can never drift from the code.
 
-    python database/generate_schema.py            # (re)write database/schema.sql
-    python database/generate_schema.py --check    # exit 1 if schema.sql is out of date (use in CI)
+    python db/generate_schema.py            # (re)write db/schema.sql
+    python db/generate_schema.py --check    # exit 1 if schema.sql is out of date (use in CI)
 
 The output is idempotent: it can be run against an existing database without errors or data loss.
 """
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BACKEND)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
 
 from sqlalchemy.dialects import postgresql  # noqa: E402
@@ -25,7 +25,7 @@ DIALECT = postgresql.dialect()
 HEADER = """\
 -- =====================================================================================================
 -- Car Rental Management System - PostgreSQL schema
--- GENERATED FILE - do not edit by hand. Edit backend/models.py and run:  python database/generate_schema.py
+-- GENERATED FILE - do not edit by hand. Edit backend/models.py and run:  python db/generate_schema.py
 -- Safe to run repeatedly (everything is IF NOT EXISTS / guarded).
 -- =====================================================================================================
 
@@ -89,9 +89,9 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         current = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else ""
         if current != sql:
-            print("database/schema.sql is OUT OF DATE - run: python database/generate_schema.py")
+            print("db/schema.sql is OUT OF DATE - run: python db/generate_schema.py")
             sys.exit(1)
-        print("database/schema.sql is up to date")
+        print("db/schema.sql is up to date")
     else:
         with open(OUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(sql)

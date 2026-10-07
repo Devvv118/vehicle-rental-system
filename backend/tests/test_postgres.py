@@ -11,8 +11,8 @@ from sqlalchemy import inspect
 import models
 from conftest import NOW, TEST_DB, engine, iso, run_script
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DB_DIR = os.path.join(ROOT, "database")
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DB_DIR = os.path.join(BACKEND_DIR, "db")
 
 
 def _generator():
@@ -94,7 +94,7 @@ def test_postgres_scheme_urls_are_normalised():
     for given in ("postgres://u:p@localhost/db", "postgresql://u:p@localhost/db"):
         env = dict(os.environ, DATABASE_URL=given)
         out = subprocess.run([sys.executable, "-c", "import database; print(database.engine.url.drivername)"],
-                             capture_output=True, text=True, env=env, cwd=os.path.join(ROOT, "backend"))
+                             capture_output=True, text=True, env=env, cwd=BACKEND_DIR)
         assert out.stdout.strip() == "postgresql+psycopg2", out.stderr
 
 

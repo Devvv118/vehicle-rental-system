@@ -4,7 +4,7 @@
 
 * **Driver / URL**: `psycopg2-binary`; `DATABASE_URL=postgresql+psycopg2://user:password@host:5432/car_rental`
   (`postgres://` and `postgresql://` URLs are normalised). `pool_pre_ping` enabled.
-* **Init scripts** (`database/`): `init_db.py` (creates the DB, tables, indexes, trigger, reference data; idempotent;
+* **Init scripts** (`backend/db/`): `init_db.py` (creates the DB, tables, indexes, trigger, reference data; idempotent;
   `--create-db`, `--sample-data`, `--reset --yes`), `schema.sql` (generated from the models by `generate_schema.py`, so
   it cannot drift - a test enforces that), `seed.sql`, `sample_data.sql`.
 * **Table names are now snake_case** (`customer`, `membership_tier`, `rental_insurance`, ...) instead of `Customer`,
@@ -72,3 +72,13 @@ against the real API (`e2e/ui_e2e.py`). No visual/design changes were made to th
 ## Known / left alone
 * ESLint reports ~16 mostly `no-explicit-any` style errors; not functional, not touched.
 * Rental/Customer list pages show IDs ("Customer #1") by design - unchanged.
+
+
+## Deployment changes (Render + Vercel + Neon)
+
+* `database/` moved to `backend/db/` (Render's Root Directory is `backend`, so the scripts must live inside it; named `db`
+  because `backend/database.py` already exists). Paths in `init_db.py`, `generate_schema.py` and the tests were updated.
+* Frontend API URL comes from `VITE_API_URL`; `vercel.json` added for client-side routing.
+* CORS: `ALLOWED_ORIGINS` (comma separated) and optional `ALLOW_VERCEL_PREVIEWS=1`; localhost is still always allowed.
+* `backend/start.sh`: creates/updates the schema, optionally resets the DB (`RESET_DB_ON_START=1`), starts uvicorn.
+* `POST /admin/reset-demo` + "Reset demo data" button in the header (disable with `DEMO_RESET_ENABLED=0`).

@@ -2,10 +2,10 @@
 """
 Initialise the PostgreSQL database for the Car Rental Management System.
 
-    python database/init_db.py                  # create tables + reference data (idempotent, safe to re-run)
-    python database/init_db.py --create-db      # ...and CREATE DATABASE first if it does not exist yet
-    python database/init_db.py --sample-data    # ...and load a few demo locations/vehicles/customers
-    python database/init_db.py --reset --yes    # DROP EVERYTHING in the database, then rebuild (destructive!)
+    python db/init_db.py                  # create tables + reference data (idempotent, safe to re-run)
+    python db/init_db.py --create-db      # ...and CREATE DATABASE first if it does not exist yet
+    python db/init_db.py --sample-data    # ...and load a few demo locations/vehicles/customers
+    python db/init_db.py --reset --yes    # DROP EVERYTHING in the database, then rebuild (destructive!)
 
 The connection comes from the DATABASE_URL environment variable, or from backend/.env, e.g.
     DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/car_rental
@@ -22,7 +22,10 @@ from psycopg2 import sql as pgsql
 from sqlalchemy.engine import make_url
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+BACKEND = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+
+from demo_reset import run_sql_file  # noqa: E402
 
 
 def load_database_url() -> str:
@@ -30,7 +33,7 @@ def load_database_url() -> str:
     if not url:
         try:
             from dotenv import load_dotenv
-            load_dotenv(os.path.join(ROOT, "backend", ".env"))
+            load_dotenv(os.path.join(BACKEND, ".env"))
             url = os.getenv("DATABASE_URL")
         except ImportError:
             pass
@@ -50,8 +53,7 @@ def connect(url, dbname=None, autocommit=False):
 
 
 def run_file(conn, filename):
-    with open(os.path.join(HERE, filename), encoding="utf-8") as f, conn.cursor() as cur:
-        cur.execute(f.read())
+    run_sql_file(conn, filename)
     print(f"  applied {filename}")
 
 

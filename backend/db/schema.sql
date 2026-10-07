@@ -1,6 +1,6 @@
 -- =====================================================================================================
 -- Car Rental Management System - PostgreSQL schema
--- GENERATED FILE - do not edit by hand. Edit backend/models.py and run:  python database/generate_schema.py
+-- GENERATED FILE - do not edit by hand. Edit backend/models.py and run:  python db/generate_schema.py
 -- Safe to run repeatedly (everything is IF NOT EXISTS / guarded).
 -- =====================================================================================================
 

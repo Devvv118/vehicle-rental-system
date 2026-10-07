@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI, Depends, HTTPException, Query, Body, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -37,10 +38,18 @@ async def catch_unhandled_errors(request: Request, call_next):
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-# Any localhost / 127.0.0.1 origin on any port (Vite falls back to 5174, 5175, ... if 5173 is taken)
+# Allowed browser origins:
+#   * any localhost / 127.0.0.1 port (Vite falls back to 5174, 5175, ... if 5173 is taken)
+#   * every origin listed in ALLOWED_ORIGINS (comma separated), e.g. https://my-app.vercel.app
+#   * optionally any *.vercel.app origin (preview deployments) when ALLOW_VERCEL_PREVIEWS=1
+ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+if os.getenv("ALLOW_VERCEL_PREVIEWS") == "1":
+    _origin_regex = r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|https://[a-z0-9-]+\.vercel\.app)$"
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],  # allows GET, POST, PUT, PATCH, DELETE, OPTIONS...
     allow_headers=["*"],  # allows Content-Type, Authorization, etc.
@@ -98,6 +107,32 @@ async def root():
         "version": "1.0.0",
         # "docs": "/docs"
     }
+
+# =============================================================================
+# DEMO ADMIN
+# =============================================================================
+
+@app.post("/admin/reset-demo")
+def reset_demo():
+    """Wipe EVERYTHING and reload the schema, reference data and demo data (portfolio demo only).
+
+    Disable on a real deployment by setting DEMO_RESET_ENABLED=0.
+    """
+    if os.getenv("DEMO_RESET_ENABLED", "1") == "0":
+        raise HTTPException(status_code=403, detail="Demo reset is disabled")
+    from db.demo_reset import reset_demo_data  # local import: only needed here
+    engine.dispose()  # drop pooled connections so nothing holds locks on the tables we are about to drop
+    conn = engine.raw_connection()
+    try:
+        reset_demo_data(conn, sample_data=True)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logger.exception("Demo reset failed")
+        raise HTTPException(status_code=500, detail="Demo reset failed")
+    finally:
+        conn.close()
+    return {"detail": "Demo data restored"}
 
 # =============================================================================
 # CUSTOMER ENDPOINTS

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { resetDemoData } from '../services/api';
 import './Layout.css';
 
 interface LayoutProps {
@@ -8,7 +9,20 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const location = useLocation();
+
+  const handleReset = async () => {
+    if (!window.confirm('Reset the demo? This deletes ALL current data and restores the original example data.')) return;
+    setResetting(true);
+    try {
+      await resetDemoData();
+      window.location.assign('/dashboard'); // full reload so no stale data stays on screen
+    } catch (e) {
+      setResetting(false);
+      window.alert('Could not reset the demo: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  };
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
@@ -80,6 +94,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <h1 className="app-title">Car Rental Management</h1>
         </div>
         <div className="header-right">
+          <button className="reset-demo-btn" onClick={handleReset} disabled={resetting}>
+            {resetting ? 'Resetting…' : '↺ Reset demo data'}
+          </button>
           <div className="user-info">
             <span>Admin User</span>
             <div className="user-avatar">👤</div>

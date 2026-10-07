@@ -158,3 +158,22 @@
   overflow-y: auto;
   background-color: #f5f7fa;
 }
+.reset-demo-btn {
+  margin-right: 16px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #495057;
+  cursor: pointer;
+}
+
+.reset-demo-btn:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.reset-demo-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

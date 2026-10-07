@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- OPTIONAL demo data so a fresh install is not empty:  python database/init_db.py --sample-data
+-- OPTIONAL demo data so a fresh install is not empty:  python db/init_db.py --sample-data
 -- Only inserts when the database has no customers/vehicles/locations yet (so it never duplicates).
 -- Requires seed.sql to have been applied first (init_db.py does that).
 -- =====================================================================================================
