@@ -339,6 +339,9 @@ export const maintenanceApi = {
       body: JSON.stringify(maintenance),
     }),
   
+  getAll: (skip = 0, limit = 1000): Promise<MaintenanceSchedule[]> =>
+    apiRequest(`/maintenance/?skip=${skip}&limit=${limit}`),
+  
   getByVehicle: (vehicleId: number): Promise<MaintenanceSchedule[]> =>
     apiRequest(`/maintenance/vehicle/${vehicleId}`),
   

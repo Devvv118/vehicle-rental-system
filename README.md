@@ -22,7 +22,7 @@ It's not connected to any payment gateway or anything, this was more about getti
 Backend
 - FastAPI
 - SQLAlchemy
-- MySQL
+- PostgreSQL
 - Pydantic for validation
 
 Frontend
@@ -35,45 +35,73 @@ Frontend
 ```
 backend/
   models.py       sqlalchemy models
-  schema.py       pydantic schemas  
+  schemas.py      pydantic schemas  
   crud.py         db operations
   database.py     engine/session setup
   main.py         all the api routes
+  tests/          pytest suite
 
-frontend/
+frontend/vehicle-rental/
   src/
     types/        typescript interfaces
     services/      api calls
     components/
     pages/
+
+database/
+  schema.sql         PostgreSQL tables/indexes/triggers (generated from models.py)
+  seed.sql           reference data (membership tiers, insurance plans, vehicle features)
+  sample_data.sql    optional demo data
+  init_db.py         one-command database setup
+  generate_schema.py regenerates schema.sql after you change models.py
+
+e2e/               browser end-to-end test
 ```
 
 Database has around 15 tables - customers, vehicles, rentals, reservations, payments, employees, locations, maintenance records, insurance plans, incident reports etc, all wired together with foreign keys.
 
 ## Running it locally
 
-You'll need MySQL running somewhere and Python + Node installed.
+You'll need PostgreSQL (12+) running somewhere and Python + Node installed.
+
+### Database
+
+Create the connection string first - `backend/.env`:
+
+```
+DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/car_rental
+```
+
+Then let the init script do everything (creates the database if it is missing, all tables, indexes, triggers and
+the reference data such as the `Standard` membership tier the app needs):
+
+```
+pip install -r backend/requirements.txt
+python database/init_db.py --create-db
+```
+
+Useful options (the script is safe to re-run, it never deletes anything unless you pass `--reset --yes`):
+
+```
+python database/init_db.py --sample-data     # also load a few demo locations / vehicles / customers
+python database/init_db.py --reset --yes     # DROP everything and rebuild from scratch (destructive!)
+```
+
+Prefer plain SQL? Run `database/schema.sql` then `database/seed.sql` with psql instead:
+
+```
+createdb car_rental
+psql -d car_rental -f database/schema.sql -f database/seed.sql
+```
+
+After changing `backend/models.py` regenerate the SQL with `python database/generate_schema.py`
+(`--check` verifies it is up to date).
 
 ### Backend
-
-First run the schema.sql file in MySQL workbench (or whatever client) to create the database and tables.
-
-Then:
 
 ```
 cd backend
 pip install -r requirements.txt
-```
-
-Make a `.env` file with your db connection string
-
-```
-DATABASE_URL=mysql+pymysql://user:password@localhost:3306/car_rental
-```
-
-Start the server
-
-```
 uvicorn main:app --reload
 ```
 
@@ -82,7 +110,7 @@ Should be running on localhost:8000, you can check the auto generated docs at lo
 ### Frontend
 
 ```
-cd frontend
+cd frontend/vehicle-rental
 npm install
 npm run dev
 ```
@@ -108,3 +136,29 @@ There's a small sql snippet in the setup docs to seed a couple customers/vehicle
 ---
 
 Built as a learning project, not meant for production use as is.
+
+
+## Tests
+
+Backend (real PostgreSQL; the schema is built from `database/schema.sql`; **the `public` schema of the test
+database is dropped**, so use a throw-away one):
+
+```
+createdb car_rental_test
+cd backend
+pip install -r requirements-dev.txt
+export TEST_DATABASE_URL=postgresql+psycopg2://user:password@127.0.0.1:5432/car_rental_test   # Windows: set
+pytest
+```
+
+End-to-end browser test (drives the real UI against the real API; **wipes the tables of the `car_rental` database**,
+override with `E2E_DB_NAME`, `E2E_DB_HOST`, `E2E_DB_PORT`, `E2E_DB_USER`, `E2E_DB_PASSWORD`). Initialise the database,
+then start backend (`:8000`) and frontend (`:5173`) first:
+
+```
+pip install psycopg2-binary playwright
+python -m playwright install chromium
+python e2e/ui_e2e.py
+```
+
+See `CHANGES.md` for everything that was fixed and why.

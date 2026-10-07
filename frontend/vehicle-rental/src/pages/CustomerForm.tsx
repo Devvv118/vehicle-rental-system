@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { customerApi } from '../services/api';
-import type { Customer, CustomerCreate } from '../types';
+import type { CustomerCreate } from '../types';
 
 const CustomerForm: React.FC = () => {
   const navigate = useNavigate();

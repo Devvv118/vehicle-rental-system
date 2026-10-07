@@ -15,13 +15,12 @@
 // export default VehicleDetail;
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { vehicleApi, maintenanceApi, rentalApi } from '../services/api';
 import type { VehicleWithFeatures, MaintenanceSchedule, Rental } from '../types';
 
 const VehicleDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [vehicle, setVehicle] = useState<VehicleWithFeatures | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceSchedule[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);

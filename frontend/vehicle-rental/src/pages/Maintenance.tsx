@@ -27,7 +27,7 @@ const Maintenance: React.FC = () => {
       setLoading(true);
       const data = filter === 'scheduled'
         ? await maintenanceApi.getScheduled()
-        : await maintenanceApi.getScheduled(); // You can modify to fetch all
+        : await maintenanceApi.getAll();
       setSchedules(data);
     } catch (err) {
       setError('Failed to load maintenance schedules');

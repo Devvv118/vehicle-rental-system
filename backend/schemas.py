@@ -1,7 +1,31 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel as _PydanticBaseModel, EmailStr, Field, ConfigDict, PlainSerializer, model_validator
+from typing import Optional, List, Annotated, Union, get_args
+import types as _types
 from datetime import datetime, date
 from decimal import Decimal
+
+# Money/decimal values are accepted as str/float/Decimal on input but are sent to the frontend as
+# JSON *numbers* (pydantic v2 would otherwise emit strings like "45.50", which breaks `a + b` in JS).
+def _allows_none(annotation) -> bool:
+    return annotation is type(None) or type(None) in get_args(annotation)
+
+
+class BaseModel(_PydanticBaseModel):
+    """Project-wide base: HTML forms send "" for empty optional inputs (dates, numbers, ...).
+    For OPTIONAL fields an empty/blank string is treated as "not provided" (None) instead of a validation error."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_strings_to_none(cls, data):
+        if isinstance(data, dict):
+            data = dict(data)
+            for name, field in cls.model_fields.items():
+                if isinstance(data.get(name), str) and data[name].strip() == "" and _allows_none(field.annotation):
+                    data[name] = None
+        return data
+
+
+Money = Annotated[Decimal, PlainSerializer(lambda v: float(v), return_type=float, when_used="json")]
 
 # Base schemas
 class CustomerBase(BaseModel):
@@ -36,9 +60,9 @@ class Customer(CustomerBase):
 class MembershipTierBase(BaseModel):
     tier_name: str = Field(..., max_length=20)
     description: Optional[str] = None
-    monthly_fee: Optional[Decimal] = None
+    monthly_fee: Optional[Money] = None
     free_upgrades: Optional[int] = None
-    bonus_point_rate: Optional[Decimal] = None
+    bonus_point_rate: Optional[Money] = None
 
 class MembershipTierCreate(MembershipTierBase):
     pass
@@ -48,12 +72,12 @@ class MembershipTier(MembershipTierBase):
 
 # Customer Membership Profile schemas
 class CustomerMembershipProfileBase(BaseModel):
-    membership_tier: str = "Standard"
-    points_balance: int = 0
-    tier_level: str = "Bronze"
+    membership_tier: Optional[str] = "Standard"
+    points_balance: Optional[int] = 0
+    tier_level: Optional[str] = "Bronze"
     last_activity_date: Optional[date] = None
-    lifetime_rentals: int = 0
-    lifetime_spending: Decimal = Decimal('0.00')
+    lifetime_rentals: Optional[int] = 0
+    lifetime_spending: Optional[Money] = Decimal('0.00')
 
 class CustomerMembershipProfileCreate(CustomerMembershipProfileBase):
     customer_id: int
@@ -64,14 +88,14 @@ class CustomerMembershipProfileUpdate(BaseModel):
     tier_level: Optional[str] = None
     last_activity_date: Optional[date] = None
     lifetime_rentals: Optional[int] = None
-    lifetime_spending: Optional[Decimal] = None
+    lifetime_spending: Optional[Money] = None
 
 class CustomerMembershipProfile(CustomerMembershipProfileBase):
     model_config = ConfigDict(from_attributes=True)
     
     profile_id: int
     customer_id: int
-    join_date: date
+    join_date: Optional[date] = None
 
 # Customer Vehicle Preference schemas
 class CustomerVehiclePreferenceBase(BaseModel):
@@ -95,7 +119,7 @@ class EmployeeBase(BaseModel):
     phone: str = Field(..., max_length=20)
     role: str = Field(..., max_length=30)
     hire_date: date
-    salary: Optional[Decimal] = None
+    salary: Optional[Money] = None
     location_id: Optional[int] = None
     manager_id: Optional[int] = None
     is_active: bool = True
@@ -109,7 +133,7 @@ class EmployeeUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, max_length=20)
     role: Optional[str] = Field(None, max_length=30)
-    salary: Optional[Decimal] = None
+    salary: Optional[Money] = None
     location_id: Optional[int] = None
     manager_id: Optional[int] = None
     is_active: Optional[bool] = None
@@ -155,7 +179,7 @@ class VehicleBase(BaseModel):
     license_plate: str = Field(..., max_length=10)
     year: int
     availability: bool = True
-    daily_rate: Decimal
+    daily_rate: Money
     mileage: int = 0
     fuel_type: str = Field(default="Gasoline", max_length=20)
     transmission: str = Field(default="Automatic", max_length=20)
@@ -171,7 +195,7 @@ class VehicleUpdate(BaseModel):
     license_plate: Optional[str] = Field(None, max_length=10)
     year: Optional[int] = None
     availability: Optional[bool] = None
-    daily_rate: Optional[Decimal] = None
+    daily_rate: Optional[Money] = None
     mileage: Optional[int] = None
     fuel_type: Optional[str] = Field(None, max_length=20)
     transmission: Optional[str] = Field(None, max_length=20)
@@ -213,9 +237,9 @@ class VehicleFeatureMapping(BaseModel):
 class VehicleMaintenanceRecordBase(BaseModel):
     last_service_date: Optional[date] = None
     next_service_due: Optional[date] = None
-    total_maintenance_cost: Decimal = Decimal('0.00')
+    total_maintenance_cost: Optional[Money] = Decimal('0.00')
     service_history: Optional[str] = None
-    current_condition: str = "Good"
+    current_condition: Optional[str] = "Good"
     maintenance_alerts: Optional[str] = None
 
 class VehicleMaintenanceRecordCreate(VehicleMaintenanceRecordBase):
@@ -224,7 +248,7 @@ class VehicleMaintenanceRecordCreate(VehicleMaintenanceRecordBase):
 class VehicleMaintenanceRecordUpdate(BaseModel):
     last_service_date: Optional[date] = None
     next_service_due: Optional[date] = None
-    total_maintenance_cost: Optional[Decimal] = None
+    total_maintenance_cost: Optional[Money] = None
     service_history: Optional[str] = None
     current_condition: Optional[str] = None
     maintenance_alerts: Optional[str] = None
@@ -245,10 +269,14 @@ class ReservationBase(BaseModel):
     reserved_end_date: datetime
     status: str = "Active"
     special_requests: Optional[str] = None
-    estimated_total: Optional[Decimal] = None
+    estimated_total: Optional[Money] = None
 
 class ReservationCreate(ReservationBase):
-    pass
+    @model_validator(mode="after")
+    def _end_after_start(self):
+        if self.reserved_end_date <= self.reserved_start_date:
+            raise ValueError("reserved_end_date must be after reserved_start_date")
+        return self
 
 class ReservationUpdate(BaseModel):
     vehicle_id: Optional[int] = None
@@ -258,7 +286,7 @@ class ReservationUpdate(BaseModel):
     reserved_end_date: Optional[datetime] = None
     status: Optional[str] = None
     special_requests: Optional[str] = None
-    estimated_total: Optional[Decimal] = None
+    estimated_total: Optional[Money] = None
 
 class Reservation(ReservationBase):
     model_config = ConfigDict(from_attributes=True)
@@ -276,20 +304,24 @@ class RentalBase(BaseModel):
     start_date: datetime
     end_date: datetime
     actual_return_date: Optional[datetime] = None
-    daily_rate: Decimal
-    total_amount: Decimal
-    security_deposit: Decimal = Decimal('200.00')
+    daily_rate: Money
+    total_amount: Money
+    security_deposit: Money = Decimal('200.00')
     mileage_start: Optional[int] = None
     mileage_end: Optional[int] = None
-    fuel_level_start: Optional[Decimal] = None
-    fuel_level_end: Optional[Decimal] = None
+    fuel_level_start: Optional[Money] = None
+    fuel_level_end: Optional[Money] = None
     status: str = "Active"
-    discount_applied: Decimal = Decimal('0.00')
-    late_fees: Decimal = Decimal('0.00')
-    damage_fees: Decimal = Decimal('0.00')
+    discount_applied: Money = Decimal('0.00')
+    late_fees: Money = Decimal('0.00')
+    damage_fees: Money = Decimal('0.00')
 
 class RentalCreate(RentalBase):
-    pass
+    @model_validator(mode="after")
+    def _end_after_start(self):
+        if self.end_date <= self.start_date:
+            raise ValueError("end_date must be after start_date")
+        return self
 
 class RentalUpdate(BaseModel):
     employee_id: Optional[int] = None
@@ -298,17 +330,17 @@ class RentalUpdate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     actual_return_date: Optional[datetime] = None
-    daily_rate: Optional[Decimal] = None
-    total_amount: Optional[Decimal] = None
-    security_deposit: Optional[Decimal] = None
+    daily_rate: Optional[Money] = None
+    total_amount: Optional[Money] = None
+    security_deposit: Optional[Money] = None
     mileage_start: Optional[int] = None
     mileage_end: Optional[int] = None
-    fuel_level_start: Optional[Decimal] = None
-    fuel_level_end: Optional[Decimal] = None
+    fuel_level_start: Optional[Money] = None
+    fuel_level_end: Optional[Money] = None
     status: Optional[str] = None
-    discount_applied: Optional[Decimal] = None
-    late_fees: Optional[Decimal] = None
-    damage_fees: Optional[Decimal] = None
+    discount_applied: Optional[Money] = None
+    late_fees: Optional[Money] = None
+    damage_fees: Optional[Money] = None
 
 class Rental(RentalBase):
     model_config = ConfigDict(from_attributes=True)
@@ -319,7 +351,7 @@ class Rental(RentalBase):
 # Payment schemas
 class PaymentBase(BaseModel):
     rental_id: int
-    amount: Decimal
+    amount: Money
     method: str = Field(..., max_length=20)
     transaction_id: Optional[str] = Field(None, max_length=100)
     status: str = "Completed"
@@ -329,7 +361,7 @@ class PaymentCreate(PaymentBase):
     pass
 
 class PaymentUpdate(BaseModel):
-    amount: Optional[Decimal] = None
+    amount: Optional[Money] = None
     method: Optional[str] = Field(None, max_length=20)
     transaction_id: Optional[str] = Field(None, max_length=100)
     status: Optional[str] = None
@@ -345,9 +377,9 @@ class Payment(PaymentBase):
 class InsurancePlanBase(BaseModel):
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
-    daily_cost: Decimal
-    coverage_amount: Decimal
-    deductible: Decimal
+    daily_cost: Money
+    coverage_amount: Money
+    deductible: Money
     is_active: bool = True
 
 class InsurancePlanCreate(InsurancePlanBase):
@@ -356,9 +388,9 @@ class InsurancePlanCreate(InsurancePlanBase):
 class InsurancePlanUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
-    daily_cost: Optional[Decimal] = None
-    coverage_amount: Optional[Decimal] = None
-    deductible: Optional[Decimal] = None
+    daily_cost: Optional[Money] = None
+    coverage_amount: Optional[Money] = None
+    deductible: Optional[Money] = None
     is_active: Optional[bool] = None
 
 class InsurancePlan(InsurancePlanBase):
@@ -370,7 +402,7 @@ class InsurancePlan(InsurancePlanBase):
 class RentalInsuranceBase(BaseModel):
     start_date: date
     end_date: date
-    premium_amount: Decimal
+    premium_amount: Money
 
 class RentalInsuranceCreate(RentalInsuranceBase):
     rental_id: int
@@ -389,7 +421,7 @@ class IncidentReportBase(BaseModel):
     incident_date: datetime
     incident_type: str = Field(..., max_length=30)
     description: str
-    estimated_cost: Optional[Decimal] = None
+    estimated_cost: Optional[Money] = None
     status: str = "Open"
     photos: Optional[str] = None
     police_report_number: Optional[str] = Field(None, max_length=50)
@@ -402,7 +434,7 @@ class IncidentReportUpdate(BaseModel):
     incident_date: Optional[datetime] = None
     incident_type: Optional[str] = Field(None, max_length=30)
     description: Optional[str] = None
-    estimated_cost: Optional[Decimal] = None
+    estimated_cost: Optional[Money] = None
     status: Optional[str] = None
     photos: Optional[str] = None
     police_report_number: Optional[str] = Field(None, max_length=50)
@@ -419,7 +451,7 @@ class MaintenanceScheduleBase(BaseModel):
     scheduled_date: date
     completed_date: Optional[date] = None
     assigned_mechanic: Optional[int] = None
-    cost: Optional[Decimal] = None
+    cost: Optional[Money] = None
     notes: Optional[str] = None
     status: str = "Scheduled"
 
@@ -431,7 +463,7 @@ class MaintenanceScheduleUpdate(BaseModel):
     scheduled_date: Optional[date] = None
     completed_date: Optional[date] = None
     assigned_mechanic: Optional[int] = None
-    cost: Optional[Decimal] = None
+    cost: Optional[Money] = None
     notes: Optional[str] = None
     status: Optional[str] = None
 
@@ -505,8 +537,8 @@ class VehicleFilters(BaseModel):
     max_year: Optional[int] = None
     availability: Optional[bool] = None
     location_id: Optional[int] = None
-    min_daily_rate: Optional[Decimal] = None
-    max_daily_rate: Optional[Decimal] = None
+    min_daily_rate: Optional[Money] = None
+    max_daily_rate: Optional[Money] = None
 
 class RentalFilters(BaseModel):
     customer_id: Optional[int] = None
@@ -516,3 +548,17 @@ class RentalFilters(BaseModel):
     start_date_to: Optional[date] = None
     pickup_location_id: Optional[int] = None
     return_location_id: Optional[int] = None
+
+# Request bodies for the PATCH endpoints (frontend sends JSON; query params stay supported)
+class VehicleAvailabilityBody(BaseModel):
+    available: bool
+
+class PointsBody(BaseModel):
+    points_to_add: int
+
+class RentalReturnBody(BaseModel):
+    mileage_end: Optional[int] = Field(None, ge=0)
+    fuel_level_end: Optional[Decimal] = Field(None, ge=0, le=1)
+    late_fees: Optional[Decimal] = Field(None, ge=0)
+    damage_fees: Optional[Decimal] = Field(None, ge=0)
+    actual_return_date: Optional[datetime] = None

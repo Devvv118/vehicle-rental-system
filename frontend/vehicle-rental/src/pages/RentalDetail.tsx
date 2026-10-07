@@ -9,13 +9,12 @@
 // export default RentalDetail;
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { rentalApi, paymentApi, incidentApi } from '../services/api';
 import type { RentalWithDetails, Payment, IncidentReport } from '../types';
 
 const RentalDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [rental, setRental] = useState<RentalWithDetails | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [incidents, setIncidents] = useState<IncidentReport[]>([]);
@@ -68,21 +67,26 @@ const RentalDetail: React.FC = () => {
   const handleReturnVehicle = async () => {
     if (!rental) return;
 
-    // Calculate late fees if applicable
+    // Build the payload from the current form values. (The old code called setReturnData() and then sent the
+    // stale `returnData`, so the calculated late fee was never actually submitted.)
+    const payload = { ...returnData };
+
+    // Calculate late fees if applicable (50% of the daily rate per started late day)
     const endDate = new Date(rental.end_date);
     const now = new Date();
-    if (now > endDate) {
+    if (now > endDate && !(payload.late_fees > 0)) {
       const daysLate = Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
-      const lateFee = daysLate * rental.daily_rate * 0.5; // 50% of daily rate per late day
-      setReturnData(prev => ({
-        ...prev,
-        late_fees: lateFee,
-      }));
+      payload.late_fees = Math.round(daysLate * Number(rental.daily_rate) * 0.5 * 100) / 100;
     }
+
+    // A cleared number input becomes NaN; drop those so the server applies its own defaults
+    const cleaned = Object.fromEntries(
+      Object.entries(payload).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))
+    );
 
     try {
       setLoading(true);
-      await rentalApi.returnVehicle(rental.rental_id, returnData);
+      await rentalApi.returnVehicle(rental.rental_id, cleaned);
       setShowReturnModal(false);
       
       // Refresh rental data
