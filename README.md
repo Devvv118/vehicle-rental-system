@@ -49,7 +49,7 @@ backend/
     generate_schema.py regenerates schema.sql after you change models.py
   start.sh             production start script (Render)
 
-frontend/vehicle-rental/
+frontend/
   src/
     types/        typescript interfaces
     services/      api calls
@@ -111,7 +111,7 @@ Should be running on localhost:8000, you can check the auto generated docs at lo
 ### Frontend
 
 ```
-cd frontend/vehicle-rental
+cd frontend
 npm install
 npm run dev
 ```
@@ -193,7 +193,7 @@ Note that on Render's free tier the service sleeps after ~15 minutes idle, so a 
 wake-up; the **Reset demo data** button in the header restores the demo on demand. **Never set `RESET_DB_ON_START=1`
 or leave the reset endpoint enabled on a database that holds real data.**
 
-**3. Vercel** - Root Directory `frontend/vehicle-rental`, framework preset Vite, and the environment variable
+**3. Vercel** - Root Directory `frontend`, framework preset Vite, and the environment variable
 `VITE_API_URL=https://your-api.onrender.com` (no trailing slash). `vercel.json` rewrites every path to `index.html`
 so refreshing a page such as `/customers` works. Redeploy after changing `VITE_API_URL` (Vite bakes it in at build time).
 

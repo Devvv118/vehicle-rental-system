@@ -58,7 +58,7 @@ against the real API (`e2e/ui_e2e.py`). No visual/design changes were made to th
 * `POINTS_PER_CURRENCY_UNIT = 1` - points = amount charged x tier `bonus_point_rate`.
 * Lifetime spending and revenue include late and damage fees.
 
-## Frontend (`frontend/vehicle-rental/`)
+## Frontend (`frontend/`)
 
 * `npm run build` failed on 3 unused variables (`CustomerForm`, `RentalDetail`, `VehicleDetail`) - removed.
 * `RentalDetail.handleReturnVehicle` called `setReturnData()` and then sent the *stale* state, so the late fee never
