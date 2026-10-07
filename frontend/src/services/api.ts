@@ -392,3 +392,13 @@ export async function resetDemoData(): Promise<void> {
     throw new ApiError(response.status, (await response.text()) || response.statusText);
   }
 }
+
+// True once the backend answers (used to detect Render's free-tier cold start)
+export async function pingServer(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/`, { cache: 'no-store' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

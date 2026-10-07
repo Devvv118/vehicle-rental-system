@@ -197,4 +197,4 @@ or leave the reset endpoint enabled on a database that holds real data.**
 `VITE_API_URL=https://your-api.onrender.com` (no trailing slash). `vercel.json` rewrites every path to `index.html`
 so refreshing a page such as `/customers` works. Redeploy after changing `VITE_API_URL` (Vite bakes it in at build time).
 
-The first request after the backend has been idle takes 30-60 s (Render cold start, plus Neon waking up).
+The first request after the backend has been idle takes 30-60 s (Render cold start, plus Neon waking up). The UI shows a "server is starting up, please wait" banner meanwhile and reloads itself once the backend answers.

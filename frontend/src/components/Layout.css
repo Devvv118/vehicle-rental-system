@@ -177,3 +177,12 @@
   opacity: 0.6;
   cursor: wait;
 }
+
+.server-waking-banner {
+  padding: 10px 24px;
+  background: #fff3cd;
+  color: #664d03;
+  border-bottom: 1px solid #ffecb5;
+  font-size: 14px;
+  text-align: center;
+}

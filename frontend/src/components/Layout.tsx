@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { resetDemoData } from '../services/api';
+import { pingServer, resetDemoData } from '../services/api';
 import './Layout.css';
 
 interface LayoutProps {
@@ -10,7 +10,38 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [resetting, setResetting] = useState(false);
+  const [serverWaking, setServerWaking] = useState(false);
   const location = useLocation();
+
+  // Render's free tier sleeps when idle: if the server does not answer quickly, ask the user to wait,
+  // keep retrying, and reload once it is up so every page fetches fresh data.
+  useEffect(() => {
+    let cancelled = false;
+    let wasSlow = false;
+    const slowTimer = window.setTimeout(() => {
+      wasSlow = true;
+      if (!cancelled) setServerWaking(true);
+    }, 2500);
+
+    const check = async () => {
+      while (!cancelled) {
+        if (await pingServer()) break;
+        wasSlow = true;
+        if (!cancelled) setServerWaking(true);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      window.clearTimeout(slowTimer);
+      if (cancelled) return;
+      if (wasSlow) window.location.reload();
+      else setServerWaking(false);
+    };
+    check();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(slowTimer);
+    };
+  }, []);
 
   const handleReset = async () => {
     if (!window.confirm('Reset the demo? This deletes ALL current data and restores the original example data.')) return;
@@ -103,6 +134,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
+
+      {serverWaking && (
+        <div className="server-waking-banner" role="status">
+          The server is starting up (free hosting). Please wait, this can take up to a minute. The page will refresh
+          automatically.
+        </div>
+      )}
 
       <div className="main-container">
         <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>

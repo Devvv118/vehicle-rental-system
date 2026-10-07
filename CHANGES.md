@@ -82,3 +82,4 @@ against the real API (`e2e/ui_e2e.py`). No visual/design changes were made to th
 * CORS: `ALLOWED_ORIGINS` (comma separated) and optional `ALLOW_VERCEL_PREVIEWS=1`; localhost is still always allowed.
 * `backend/start.sh`: creates/updates the schema, optionally resets the DB (`RESET_DB_ON_START=1`), starts uvicorn.
 * `POST /admin/reset-demo` + "Reset demo data" button in the header (disable with `DEMO_RESET_ENABLED=0`).
+* "Server is starting up, please wait" banner (Layout) while the backend is cold-starting; auto-reloads when it answers.
